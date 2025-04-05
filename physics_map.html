@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Карта физики</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #1a1a25;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #search {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px;
+            width: 300px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid #444;
+            color: white;
+        }
+
+        .node {
+            cursor: pointer;
+            stroke: #fff;
+            stroke-width: 1px;
+            transition: all 0.3s;
+        }
+
+        .link {
+            stroke: #666;
+            stroke-opacity: 0.4;
+        }
+
+        .zone {
+            fill-opacity: 0.1;
+            stroke-width: 2;
+            stroke-dasharray: 4;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 600px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <input type="text" id="search" placeholder="Поиск разделов...">
+    <div id="modal" class="modal"></div>
+    <svg></svg>
+
+<script>
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+// Цветовые зоны
+const colors = {
+    classical: '#2c3e50',
+    relativity: '#e67e22',
+    quantum: '#9b59b6',
+    thermodynamics: '#e74c3c',
+    modern_physics: '#2ecc71',
+    unknown: '#7f8c8d'
+};
+
+const data = {
+    nodes: [
+        // Классическая физика (тёмно-синий)
+        {id: 'classical', name: 'Классическая физика', x: width/4, y: height/2, color: colors.classical},
+        {id: 'mechanics', name: 'Законы движения', x: width/4-150, y: height/2-100, color: colors.classical},
+        {id: 'gravitation', name: 'Закон тяготения', x: width/4+150, y: height/2-50, color: colors.classical},
+        {id: 'hydro', name: 'Гидродинамика', x: width/4-100, y: height/2+120, color: colors.classical},
+        
+        // Термодинамика (красный)
+        {id: 'thermo', name: 'Термодинамика', x: width/4, y: height/2+200, color: colors.thermodynamics},
+        
+        // Теория относительности (оранжевый)
+        {id: 'relativity', name: 'Теория относительности', x: width/2, y: height/2, color: colors.relativity},
+        {id: 'special', name: 'СТО', x: width/2-120, y: height/2-80, color: colors.relativity},
+        {id: 'general', name: 'ОТО', x: width/2+100, y: height/2-60, color: colors.relativity},
+        
+        // Квантовая физика (фиолетовый)
+        {id: 'quantum', name: 'Квантовая физика', x: 3*width/4, y: height/2, color: colors.quantum},
+        {id: 'q_mechanics', name: 'Квантовая механика', x: 3*width/4-140, y: height/2-100, color: colors.quantum},
+        {id: 'qft', name: 'Квантовая теория поля', x: 3*width/4+100, y: height/2-80, color: colors.quantum},
+        
+        // Современная физика (зелёный)
+        {id: 'modern', name: 'Современные теории', x: width/2, y: 100, color: colors.modern_physics},
+        {id: 'q_gravity', name: 'Квантовая гравитация', x: width/2-120, y: 180, color: colors.modern_physics},
+        {id: 'dark_matter', name: 'Тёмная материя', x: width/2+100, y: 180, color: colors.modern_physics},
+        {id: 'dark_energy', name: 'Тёмная энергия', x: width/2, y: 250, color: colors.modern_physics},
+        
+        // Пространство незнания (серый)
+        {id: 'unknown', name: 'Пространство незнания', x: width/2, y: height-100, color: colors.unknown}
+    ],
+    
+    links: [
+        {source: 'classical', target: 'mechanics'},
+        {source: 'classical', target: 'gravitation'},
+        {source: 'classical', target: 'hydro'},
+        {source: 'classical', target: 'thermo'},
+        
+        {source: 'relativity', target: 'special'},
+        {source: 'relativity', target: 'general'},
+        {source: 'general', target: 'modern'},
+        
+        {source: 'quantum', target: 'q_mechanics'},
+        {source: 'quantum', target: 'qft'},
+        {source: 'qft', target: 'modern'},
+        
+        {source: 'modern', target: 'q_gravity'},
+        {source: 'modern', target: 'dark_matter'},
+        {source: 'modern', target: 'dark_energy'},
+        
+        {source: 'unknown', target: 'modern'},
+        {source: 'unknown', target: 'relativity'}
+    ]
+};
+
+const svg = d3.select('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+// Фоновые зоны
+const zones = [
+    {id: 'classical', points: [[width/4-200, height/2-150], [width/4+200, height/2-150], [width/4+200, height/2+250], [width/4-200, height/2+250]]},
+    {id: 'relativity', points: [[width/2-200, height/2-150], [width/2+200, height/2-150], [width/2+200, height/2+150], [width/2-200, height/2+150]]},
+    {id: 'quantum', points: [[3*width/4-200, height/2-150], [3*width/4+200, height/2-150], [3*width/4+200, height/2+150], [3*width/4-200, height/2+150]]},
+    {id: 'unknown', points: [[width/2-300, height-200], [width/2+300, height-200], [width/2+300, height], [width/2-300, height]]}
+];
+
+svg.selectAll('polygon.zone')
+    .data(zones)
+    .enter()
+    .append('polygon')
+    .attr('points', d => d.points.map(p => p.join(',')).join(' '))
+    .attr('fill', d => colors[d.id])
+    .attr('class', 'zone')
+    .attr('stroke', d => colors[d.id]);
+
+// Связи
+svg.selectAll('line.link')
+    .data(data.links)
+    .enter()
+    .append('line')
+    .attr('class', 'link')
+    .attr('x1', d => data.nodes.find(n => n.id === d.source).x)
+    .attr('y1', d => data.nodes.find(n => n.id === d.source).y)
+    .attr('x2', d => data.nodes.find(n => n.id === d.target).x)
+    .attr('y2', d => data.nodes.find(n => n.id === d.target).y);
+
+// Узлы
+const nodes = svg.selectAll('circle.node')
+    .data(data.nodes)
+    .enter()
+    .append('circle')
+    .attr('class', 'node')
+    .attr('cx', d => d.x)
+    .attr('cy', d => d.y)
+    .attr('r', 10)
+    .attr('fill', d => d.color)
+    .on('click', showModal);
+
+// Текст
+svg.selectAll('text.label')
+    .data(data.nodes)
+    .enter()
+    .append('text')
+    .attr('x', d => d.x + 15)
+    .attr('y', d => d.y + 5)
+    .text(d => d.name)
+    .attr('fill', 'white')
+    .attr('font-size', '12px');
+
+// Поиск
+d3.select('#search').on('input', function() {
+    const term = this.value.toLowerCase();
+    nodes.attr('opacity', d => 
+        d.name.toLowerCase().includes(term) ? 1 : 0.2
+    );
+});
+
+// Модальное окно
+function showModal(event, d) {
+    const descriptions = {
+        'q_gravity': 'Теория, пытающаяся объединить квантовую механику и ОТО. Основные подходы: теория струн и петлевая квантовая гравитация.',
+        'dark_matter': 'Гипотетическая форма материи, не испускающая электромагнитного излучения. Составляет около 27% массы Вселенной.',
+        'dark_energy': 'Гипотетическая энергия, вызывающая ускоренное расширение Вселенной. Составляет около 68% её массы-энергии.',
+        'thermo': 'Наука о тепловых явлениях. Основные законы: сохранение энергии, рост энтропии, недостижимость абсолютного нуля.'
+    };
+    
+    const modal = d3.select('#modal');
+    modal.html(`
+        <h2>${d.name}</h2>
+        <p>${descriptions[d.id] || 'Описание раздела в разработке'}</p>
+        <button onclick="document.getElementById('modal').style.display='none'">
+            Закрыть
+        </button>
+    `).style('display', 'block');
+}
+</script>
+</body>
+</html>
