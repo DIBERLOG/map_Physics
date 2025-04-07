@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Карта физики</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #1a1a25;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            cursor: grab;
+        }
+
+        #search {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px;
+            width: 300px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid #444;
+            color: white;
+        }
+
+        .node {
+            cursor: pointer;
+            stroke: #fff;
+            stroke-width: 1px;
+            transition: all 0.3s;
+        }
+
+        .link {
+            stroke: #666;
+            stroke-opacity: 0.4;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 600px;
+            z-index: 1000;
+            color: white;
+        }
+
+        .zone {
+            fill-opacity: 0.08;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-dasharray: 4;
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+
+        .zone-label {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <input type="text" id="search" placeholder="Поиск разделов...">
+    <div id="modal" class="modal"></div>
+    <svg></svg>
+
+<script>
+const width = window.innerWidth;
+const height = window.innerHeight;
+let transform = d3.zoomIdentity;
+
+const colors = {
+    classical: '#2c3e50',
+    relativity: '#e67e22',
+    quantum: '#9b59b6',
+    future: '#2ecc71',
+    unknown: '#7f8c8d',
+    main: '#e74c3c'
+};
+
+const data = {
+    nodes: [
+        {id: 'main', name: 'Карта физики', x: width/2, y: 100, color: colors.main, size: 24},
+        
+        // Основные разделы
+        {id: 'classical', name: 'Классическая физика', x: width/2 - 600, y: height/2 - 200, color: colors.classical},
+        {id: 'relativity', name: 'Теория относительности', x: width/2 + 600, y: height/2 - 200, color: colors.relativity},
+        {id: 'quantum', name: 'Квантовая физика', x: width/2, y: 300, color: colors.quantum},
+        {id: 'unknown', name: 'Пропасть незнания', x: width/2, y: height - 250, color: colors.unknown},
+        {id: 'future', name: 'Будущее', x: width/2, y: height/2 + 100, color: colors.future},
+        
+        // Подразделы классической физики
+        {id: 'mechanics_laws', name: 'Законы движения', x: width/2 - 750, y: height/2 - 300, color: colors.classical},
+        {id: 'newton_mechanics', name: 'Ньютоновская механика', x: width/2 - 850, y: height/2 - 250, color: colors.classical},
+        {id: 'gravitation_law', name: 'Закон тяготения', x: width/2 - 650, y: height/2 - 250, color: colors.classical},
+        {id: 'math_analysis', name: 'Математический анализ', x: width/2 - 750, y: height/2 - 150, color: colors.classical},
+        {id: 'optics', name: 'Оптика', x: width/2 - 500, y: height/2 - 150, color: colors.classical},
+        {id: 'cosmology', name: 'Космология', x: width/2 - 750, y: height/2 - 50, color: colors.classical},
+        {id: 'space_mechanics', name: 'Космическая механика', x: width/2 - 650, y: height/2 - 50, color: colors.classical},
+        {id: 'waves', name: 'Волны', x: width/2 - 750, y: height/2 + 50, color: colors.classical},
+        {id: 'electromagnetism', name: 'Электромагнетизм', x: width/2 - 650, y: height/2 + 50, color: colors.classical},
+        {id: 'hydrodynamics', name: 'Гидродинамика', x: width/2 - 850, y: height/2 + 150, color: colors.classical},
+        {id: 'chaos', name: 'Теория хаоса', x: width/2 - 650, y: height/2 + 150, color: colors.classical},
+        {id: 'thermodynamics', name: 'Термодинамика', x: width/2 - 700, y: height/2 + 250, color: colors.classical},
+
+        // Подразделы квантовой физики
+        {id: 'quantum_basics', name: 'Основы квантмеха', x: width/2 - 250, y: 150, color: colors.quantum},
+        {id: 'qft_theory', name: 'КТП', x: width/2 + 250, y: 150, color: colors.quantum},
+        {id: 'nuclear_physics', name: 'Ядерная физика', x: width/2 - 350, y: 250, color: colors.quantum},
+        {id: 'atomic_theory', name: 'Атомная теория', x: width/2 - 150, y: 250, color: colors.quantum},
+        {id: 'particle_physics', name: 'Физика частиц', x: width/2 + 150, y: 250, color: colors.quantum},
+        {id: 'condensed_matter', name: 'Конденсированные среды', x: width/2 + 350, y: 250, color: colors.quantum},
+
+        // Другие разделы
+        {id: 'special', name: 'СТО', x: width/2 + 750, y: height/2 - 250, color: colors.relativity},
+        {id: 'general', name: 'ОТО', x: width/2 + 750, y: height/2 - 50, color: colors.relativity},
+        {id: 'q_mechanics', name: 'Квантовая механика', x: width/2 - 200, y: 200, color: colors.quantum},
+        {id: 'qft', name: 'КТП', x: width/2 + 200, y: 200, color: colors.quantum},
+        {id: 'q_gravity', name: 'Квантовая гравитация', x: width/2 - 200, y: height/2 + 200, color: colors.future},
+        {id: 'dark_energy', name: 'Тёмная энергия', x: width/2, y: height/2 + 200, color: colors.future},
+        {id: 'dark_matter', name: 'Тёмная материя', x: width/2 + 200, y: height/2 + 200, color: colors.future}
+    ],
+    
+    links: [
+        {source: 'main', target: 'classical'},
+        {source: 'main', target: 'relativity'},
+        {source: 'main', target: 'quantum'},
+        {source: 'main', target: 'unknown'},
+        {source: 'main', target: 'future'},
+        
+        // Связи классической физики
+        {source: 'classical', target: 'mechanics_laws'},
+        {source: 'mechanics_laws', target: 'newton_mechanics'},
+        {source: 'mechanics_laws', target: 'gravitation_law'},
+        {source: 'classical', target: 'math_analysis'},
+        {source: 'classical', target: 'optics'},
+        {source: 'classical', target: 'cosmology'},
+        {source: 'classical', target: 'space_mechanics'},
+        {source: 'classical', target: 'waves'},
+        {source: 'classical', target: 'electromagnetism'},
+        {source: 'classical', target: 'hydrodynamics'},
+        {source: 'classical', target: 'chaos'},
+        {source: 'classical', target: 'thermodynamics'},
+
+        // Связи квантовой физики
+        {source: 'quantum', target: 'quantum_basics'},
+        {source: 'quantum', target: 'qft_theory'},
+        {source: 'quantum', target: 'nuclear_physics'},
+        {source: 'quantum', target: 'atomic_theory'},
+        {source: 'quantum', target: 'particle_physics'},
+        {source: 'quantum', target: 'condensed_matter'},
+        {source: 'quantum_basics', target: 'q_mechanics'},
+        {source: 'qft_theory', target: 'qft'},
+        {source: 'nuclear_physics', target: 'q_mechanics'},
+        {source: 'atomic_theory', target: 'q_mechanics'},
+        {source: 'particle_physics', target: 'qft'},
+        {source: 'condensed_matter', target: 'q_mechanics'},
+
+        // Остальные связи
+        {source: 'relativity', target: 'special'},
+        {source: 'relativity', target: 'general'},
+        {source: 'future', target: 'q_gravity'},
+        {source: 'future', target: 'dark_energy'},
+        {source: 'future', target: 'dark_matter'},
+        {source: 'unknown', target: 'future'},
+        {source: 'unknown', target: 'qft'}
+    ]
+};
+
+const svg = d3.select('svg')
+    .attr('width', width)
+    .attr('height', height)
+    .call(d3.zoom()
+        .scaleExtent([0.5, 5])
+        .on('zoom', (event) => {
+            transform = event.transform;
+            g.attr('transform', transform);
+        }))
+    .on('dblclick.zoom', null);
+
+const g = svg.append('g');
+
+const zones = [
+    {
+        id: 'classical',
+        x: width/2 - 900,
+        y: height/2 - 400,
+        width: 600,
+        height: 800,
+        color: colors.classical,
+        label: 'Классическая физика'
+    },
+    {
+        id: 'relativity',
+        x: width/2 + 550,
+        y: height/2 - 400,
+        width: 500,
+        height: 500,
+        color: colors.relativity,
+        label: 'Теория относительности'
+    },
+    {
+        id: 'quantum',
+        x: width/2 - 300,
+        y: 100,
+        width: 600,
+        height: 300,
+        color: colors.quantum,
+        label: 'Квантовая физика'
+    },
+    {
+        id: 'future',
+        x: width/2 - 350,
+        y: height/2,
+        width: 700,
+        height: 300,
+        color: colors.future,
+        label: 'Будущее науки'
+    },
+    {
+        id: 'unknown',
+        x: width/2 - 450,
+        y: height - 350,
+        width: 900,
+        height: 250,
+        color: colors.unknown,
+        label: 'Пропасть незнания'
+    }
+];
+
+g.selectAll('rect.zone')
+    .data(zones)
+    .enter()
+    .append('rect')
+    .attr('class', 'zone')
+    .attr('rx', 20)
+    .attr('x', d => d.x)
+    .attr('y', d => d.y)
+    .attr('width', d => d.width)
+    .attr('height', d => d.height)
+    .attr('fill', d => d.color)
+    .attr('stroke', d => d.color);
+
+g.selectAll('text.zone-label')
+    .data(zones)
+    .enter()
+    .append('text')
+    .attr('class', 'zone-label')
+    .attr('x', d => d.x + 20)
+    .attr('y', d => d.y + 40)
+    .text(d => d.label)
+    .attr('fill', d => d.color);
+
+g.selectAll('line.link')
+    .data(data.links)
+    .enter()
+    .append('line')
+    .attr('class', 'link')
+    .attr('x1', d => data.nodes.find(n => n.id === d.source).x)
+    .attr('y1', d => data.nodes.find(n => n.id === d.source).y)
+    .attr('x2', d => data.nodes.find(n => n.id === d.target).x)
+    .attr('y2', d => data.nodes.find(n => n.id === d.target).y);
+
+const nodes = g.selectAll('circle.node')
+    .data(data.nodes)
+    .enter()
+    .append('circle')
+    .attr('class', 'node')
+    .attr('cx', d => d.x)
+    .attr('cy', d => d.y)
+    .attr('r', d => d.size || 12)
+    .attr('fill', d => d.color)
+    .on('click', showModal);
+
+g.selectAll('text.label')
+    .data(data.nodes)
+    .enter()
+    .append('text')
+    .attr('x', d => d.x + 18)
+    .attr('y', d => d.y + 5)
+    .text(d => d.name)
+    .attr('fill', 'white')
+    .attr('font-size', '12px');
+
+d3.select('#search').on('input', function() {
+    const term = this.value.toLowerCase();
+    nodes.attr('opacity', d => 
+        d.name.toLowerCase().includes(term) ? 1 : 0.2
+    );
+    g.selectAll('text.label')
+        .attr('opacity', d => 
+            d.name.toLowerCase().includes(term) ? 1 : 0.2
+        );
+});
+
+function showModal(event, d) {
+    const descriptions = {
+        'main': 'Центральная карта всех основных направлений физики',
+        'future': 'Перспективные направления: квантовая гравитация, тёмная материя и энергия',
+        'q_gravity': 'Объединение квантовой механики и общей теории относительности',
+        'dark_energy': 'Гипотетическая энергия (68% Вселенной)',
+        'dark_matter': 'Невидимая гравитационная масса (27% Вселенной)',
+        'unknown': 'Неизученные области и фундаментальные вопросы',
+        'qft': 'Квантовая теория поля - основа физики элементарных частиц',
+        'thermo': 'Законы тепловых процессов и преобразования энергии',
+        'mechanics_laws': 'Основные принципы движения тел',
+        'newton_mechanics': 'Три закона Ньютона и их применение в космической механике',
+        'gravitation_law': 'Теория гравитации Ньютона с уточнениями Ляпунова',
+        'math_analysis': 'Математический аппарат: дифференциальные уравнения и вариационное исчисление',
+        'optics': 'Геометрическая и волновая оптика с работами Ломоносова',
+        'cosmology': 'Теория расширяющейся Вселенной Фридмана',
+        'space_mechanics': 'Ракетная динамика и уравнения Циолковского',
+        'waves': 'Теория колебаний и акустические исследования',
+        'electromagnetism': 'Уравнения Максвелла и работы Попова',
+        'hydrodynamics': 'Теория турбулентности Колмогорова',
+        'chaos': 'Детерминированный хаос и работы Синая',
+        'thermodynamics': 'Законы термодинамики и исследования Капицы',
+        'quantum_basics': 'Уравнение Шрёдингера (интерпретация М.А. Маркова) и теория измерений (В.А. Фок)',
+        'qft_theory': 'Стандартная модель с вкладом Л.Б. Окуня и калибровочные теории А.А. Славнова',
+        'nuclear_physics': 'Советская ядерная школа: модель Я.И. Френкеля и работы И.В. Курчатова',
+        'atomic_theory': 'Теория Бора-Зоммерфельда и квантовые переходы Л.И. Мандельштама',
+        'particle_physics': 'Физика кварков (Б.М. Понтекорво) и нейтринные исследования (проект "Байкал")',
+        'condensed_matter': 'Сверхпроводимость (Гинзбург-Ландау) и сверхтекучесть (эксперименты П.Л. Капицы)'
+    };
+    
+    const modal = d3.select('#modal');
+    modal.html(`
+        <h2>${d.name}</h2>
+        <p>${descriptions[d.id] || 'Описание раздела в разработке'}</p>
+        <button onclick="document.getElementById('modal').style.display='none'">
+            Закрыть
+        </button>
+    `).style('display', 'block');
+}
+</script>
+</body>
+</html>
