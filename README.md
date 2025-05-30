@@ -1,6 +1,5 @@
 [![Demo](https://img.shields.io/badge/Try_Demo-orange?style=for-the-badge)](https://phys.kpapo.ru)
-[![GitHub](https://img.shields.io/badge/View_Code-black?style=for-the-badge)]
-(https://github.com/DIBERLOG/map_physics)
+[![GitHub](https://img.shields.io/badge/View_Code-black?style=for-the-badge)](https://github.com/DIBERLOG/map_physics)
 
 Визуализация взаимосвязей между разделами физики.
 
