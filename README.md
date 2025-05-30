@@ -1,6 +1,6 @@
 # 🌌 Интерактивная карта физики (в разработке)
 
-[![Demo](https://img.shields.io/badge/Try-Demo-orange?style=for-the-badge)](https://phys.kpapo.ru)
+[![Demo](https://img.shields.io/badge/Try-Demo-orange?style=for-the-badge)
 [![GitHub](https://img.shields.io/badge/View-GitHub-black?style=for-the-badge)](https://github.com/DIBERLOG/physics-map)
 
 Визуализация взаимосвязей между разделами физики.
